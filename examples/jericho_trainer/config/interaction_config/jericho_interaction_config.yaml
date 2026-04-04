@@ -1,0 +1,4 @@
+interaction:
+  - name: "jericho"
+    class_name: "verl.interactions.jericho_interaction.JerichoInteraction"
+    config: {}
