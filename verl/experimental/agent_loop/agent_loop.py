@@ -917,6 +917,12 @@ class AgentLoopWorker:
         if self.reward_loop_worker_handles is None and input_non_tensor_batch:
             non_tensor_batch.update(input_non_tensor_batch)
 
+        # add turn_scores and tool_rewards to non_tensor_batch
+        for key in ("turn_scores", "tool_rewards"):
+            temp_arr = np.empty(len(inputs), dtype=object)
+            temp_arr[:] = [input.extra_fields.get(key) for input in inputs]
+            non_tensor_batch[key] = temp_arr
+
         # add reward_extra_info to non_tensor_batch
         reward_extra_infos = [input.extra_fields.get("reward_extra_info", {}) for input in inputs]
         reward_extra_keys = list(reward_extra_infos[0].keys())

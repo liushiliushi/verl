@@ -34,6 +34,12 @@ class NaiveRewardManager(RewardManagerBase):
     async def run_single(self, data: DataProto) -> dict:
         assert len(data) == 1, "Only support single data item"
         data_item = data[0]
+        # Debug
+        _tef = data_item.non_tensor_batch.get("tool_extra_fields", None)
+        print(f"[REWARD_DEBUG] tool_extra_fields type={type(_tef).__name__}, keys={list(_tef.keys()) if hasattr(_tef, 'keys') else 'N/A'}")
+        if hasattr(_tef, 'keys'):
+            _ts = _tef.get("turn_scores", "NOT_IN_TEF")
+            print(f"[REWARD_DEBUG] tool_extra_fields.turn_scores={_ts}")
         response_ids = data_item.batch["responses"]
         response_length = response_ids.shape[-1]
         valid_response_length = data_item.batch["attention_mask"][-response_length:].sum()

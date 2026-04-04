@@ -1,11 +1,5 @@
-"""Custom reward function for Jericho text adventure games.
+"""Custom reward function for Jericho text adventure games."""
 
-Replays the LLM's actions in the Jericho environment to compute the game score.
-Used via reward.custom_reward_function.path in the training config.
-"""
-
-import os
-import re
 from typing import Any, Optional
 
 
@@ -16,33 +10,68 @@ def compute_score(
     extra_info: Optional[dict[str, Any]] = None,
     **kwargs,
 ) -> float:
-    """Compute reward by replaying LLM actions in Jericho.
-
-    Args:
-        data_source: Should be "jericho".
-        solution_str: The decoded full response text containing all assistant turns.
-        ground_truth: The game file path (set in parquet data).
-        extra_info: Additional info from the dataset.
-
-    Returns:
-        The total game score as a float.
-    """
-    import jericho
-
-    game_file = ground_truth
-    if not game_file or not os.path.exists(game_file):
+    if extra_info is None:
         return 0.0
 
-    # Parse actions from the multi-turn conversation text.
-    # In multi-turn mode, solution_str contains the full decoded response
-    # including both assistant and user turns. We extract lines that look
-    # like short action commands (typically 1-5 words).
-    actions = _extract_actions(solution_str)
+    # Debug: print everything relevant
+    turn_scores = extra_info.get("turn_scores", None)
+    tool_rewards = extra_info.get("tool_rewards", None)
+    rollout_reward_scores = extra_info.get("rollout_reward_scores", None)
+    num_turns = extra_info.get("num_turns", None)
 
+    print(f"[JERICHO_REWARD] turn_scores={turn_scores} (type={type(turn_scores).__name__})")
+    print(f"[JERICHO_REWARD] tool_rewards={tool_rewards} (type={type(tool_rewards).__name__})")
+    print(f"[JERICHO_REWARD] rollout_reward_scores={rollout_reward_scores}")
+    print(f"[JERICHO_REWARD] num_turns={num_turns}")
+
+    # Try turn_scores first
+    if turn_scores is not None:
+        try:
+            scores = list(turn_scores)
+            if scores:
+                total = float(sum(scores))
+                print(f"[JERICHO_REWARD] Using turn_scores sum={total}")
+                return total
+        except Exception as e:
+            print(f"[JERICHO_REWARD] Error processing turn_scores: {e}")
+
+    # Try tool_rewards
+    if tool_rewards is not None:
+        try:
+            rewards = list(tool_rewards)
+            if rewards:
+                total = float(sum(rewards))
+                print(f"[JERICHO_REWARD] Using tool_rewards sum={total}")
+                return total
+        except Exception as e:
+            print(f"[JERICHO_REWARD] Error processing tool_rewards: {e}")
+
+    # Fallback: replay from solution_str
+    import os
+    game_file = ground_truth
+    if not game_file or not os.path.exists(game_file):
+        print(f"[JERICHO_REWARD] No game file, returning 0")
+        return 0.0
+
+    # Extract actions - handle <think> tags from Qwen3
+    text = solution_str
+    # Remove <think>...</think> blocks
+    import re
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+
+    actions = []
+    for line in text.strip().split("\n"):
+        line = line.strip()
+        if line.upper().startswith("ACTION:"):
+            action = line.split(":", 1)[1].strip()
+            if action:
+                actions.append(action)
+
+    print(f"[JERICHO_REWARD] Replay: {len(actions)} actions from solution_str")
     if not actions:
         return 0.0
 
-    # Replay actions in Jericho
+    import jericho
     try:
         env = jericho.FrotzEnv(game_file)
         env.reset()
@@ -56,38 +85,8 @@ def compute_score(
             except Exception:
                 continue
         env.close()
+        print(f"[JERICHO_REWARD] Replay reward={total_reward}")
         return total_reward
-    except Exception:
+    except Exception as e:
+        print(f"[JERICHO_REWARD] Replay error: {e}")
         return 0.0
-
-
-def _extract_actions(solution_str: str) -> list[str]:
-    """Extract action commands from the multi-turn response text.
-
-    Looks for "ACTION: xxx" lines (evotest format). Falls back to
-    short lines as a heuristic if no ACTION: lines are found.
-    """
-    actions = []
-    lines = solution_str.strip().split("\n")
-
-    # First pass: look for "ACTION: xxx" lines
-    for line in lines:
-        line = line.strip()
-        if line.upper().startswith("ACTION:"):
-            action = line.split(":", 1)[1].strip()
-            if action:
-                actions.append(action)
-
-    if actions:
-        return actions
-
-    # Fallback: short lines that look like commands
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        if len(line) <= 60 and line.count(".") <= 1:
-            words = line.split()
-            if 1 <= len(words) <= 8:
-                actions.append(line)
-    return actions
