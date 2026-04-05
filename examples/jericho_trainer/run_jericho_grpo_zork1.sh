@@ -7,14 +7,14 @@ project_name='jericho-grpo'
 exp_name='jericho-grpo-zork1'
 
 MODEL_PATH=${MODEL_PATH:-"/ndata/yibo/models/Qwen3-32B"}
-TRAIN_FILE=${TRAIN_FILE:-"$HOME/data/jericho_zork1/train.parquet"}
+TRAIN_FILE=${TRAIN_FILE:-"$HOME/data/jericho_zork1/train_bs8.parquet"}
 TEST_FILE=${TEST_FILE:-"$HOME/data/jericho_zork1/test.parquet"}
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     data.train_files="${TRAIN_FILE}" \
     data.val_files="${TEST_FILE}" \
-    data.train_batch_size=1 \
+    data.train_batch_size=8 \
     data.max_prompt_length=1024 \
     data.max_response_length=8192 \
     data.filter_overlong_prompts=True \
