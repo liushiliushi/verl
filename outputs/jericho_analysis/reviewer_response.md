@@ -32,15 +32,17 @@ We conduct experiments on Zork1 (max possible score: 350) using Qwen3-32B (bf16)
 | **8**   | 1          | 1          | 1e-6     | 16.2     | 35      | 0       |
 | **16**  | 1          | 1          | 1e-6     | 13.6     | 40      | 0       |
 | **32**  | 1          | 1          | 1e-6     | 12.0     | 40      | -5      |
-| 8       | **8**      | 1          | 1e-5     | [PH]     | [PH]    | [PH]    |
 | 8       | 1          | **2**      | 1e-6     | 10.4     | 40      | 0       |
 | 8       | 1          | **4**      | 1e-6     | 17.1     | 40      | 5       |
-| 8       | 1          | 4          | **1e-5** | **25.5** | **45**  | -5      |
+| 8       | 1          | 4          | **1e-5** | 25.5     | 45      | -5      |
+| 8       | **8**      | 1          | **1e-5** | **40.7** | **55**  | 5       |
 
 ### Analysis
 
-The best configuration found (rollout=8, batch size=1, ppo_epochs=4, lr=1e-5) achieves a mean validation score of 25.5 and a maximum of 45 out of 350, which is still below JitRL's mean score of 42.1 on Zork1 using the same Qwen3-32B model.
+The best configuration (rollout=8, batch_size=8, ppo_epochs=1, lr=1e-5) achieves a mean validation score of **40.7** and a maximum of **55** out of 350. Notably, the validation score shows a clear upward learning curve, stabilizing at 55 in the final 20 steps. This approaches JitRL's mean score of 42.1 on Zork1 using the same Qwen3-32B model.
 
-It is also worth noting the difference in sample efficiency. Over 50 steps, JitRL requires exactly **50 game episodes** in total. In contrast, GRPO requires **50 × rollout × batch_size** training episodes plus the 50 evaluation episodes. In our original paper (rollout=8, batch_size=1), this corresponds to **400 training episodes**. The most expensive configuration in this sweep (batch_size=8, rollout=8) consumes **3,200 training episodes** — over 60× more than JitRL. Despite this considerably larger training budget, GRPO does not match JitRL's performance (mean score 42.1 on Zork1), further supporting the sample efficiency of inference-time approaches.
+Increasing batch size from 1 to 8 (with the same rollout count) provided the most significant improvement (25.5 → 40.7). As discussed above, although the total number of trajectories is the same as rollout=64 with batch_size=1, the per-group normalization in the batch_size=8 setting appears to produce more effective learning signals for this task.
+
+It is also worth noting the difference in sample efficiency. Over 50 steps, JitRL requires exactly **50 game episodes** in total. In contrast, GRPO requires **50 × rollout × batch_size** training episodes plus the 50 evaluation episodes. In our original paper (rollout=8, batch_size=1), this corresponds to **400 training episodes**. The best configuration in this sweep (batch_size=8, rollout=8) consumes **3,200 training episodes** — over 60× more than JitRL. While GRPO with extensive tuning can approach JitRL's performance, this comes at a substantially higher sample cost, further supporting the sample efficiency of inference-time approaches.
 
 We thank the reviewer for the time and constructive feedback. We will update the paper to include the GRPO training code, detailed configuration, the full hyperparameter sweep, and the corresponding results.
